@@ -38,16 +38,6 @@
   }
   .admin-gear:hover{opacity:1;background:rgba(255,255,255,.7);color:#4f46e5}
 
-  /* Đồng hồ đếm ngược */
-  .timer-box{
-    display:none; background:#fffbeb; border:2px solid var(--warn);
-    color:#b45309; padding:12px; border-radius:12px; margin-bottom:16px;
-    text-align:center; font-weight:800; font-size:1.1rem;
-  }
-  .timer-box.active{display:block; animation:pulse-warn 2s infinite}
-  .timer-box.danger{border-color:var(--danger); color:var(--danger); background:#fef2f2;}
-  @keyframes pulse-warn{0%{box-shadow:0 0 0 0 #f59e0b44}70%{box-shadow:0 0 0 10px #f59e0b00}100%{box-shadow:0 0 0 0 #f59e0b00}}
-
   /* ============ CHỌN TÊN ============ */
   .pick{display:flex;flex-direction:column;gap:14px}
   select{
@@ -138,7 +128,7 @@
   @media(max-width:760px){.setup{grid-template-columns:1fr}}
 
   .lbl{display:block;font-size:.85rem;font-weight:600;color:#4b5563;margin-bottom:6px}
-  textarea,input[type=text],input[type=number]{
+  textarea,input[type=text],input[type=number],input[type=date]{
     width:100%;padding:10px 12px;border:1.5px solid var(--line);
     border-radius:10px;font-size:.95rem;font-family:inherit;outline:none;
     background:#fff;transition:.15s;
@@ -184,12 +174,6 @@
   <!-- CHỌN TÊN + NÚT -->
   <section class="card">
     <h2>👆 Chọn tên của bạn <span class="count" id="nameCount"></span></h2>
-    
-    <!-- Đồng hồ đếm ngược -->
-    <div id="timerBox" class="timer-box">
-      ⏳ Thời gian còn lại: <span id="timeDisplay">00:00</span>
-    </div>
-
     <div class="pick">
       <select id="studentSelect"></select>
       <button id="drawBtn" class="big-btn">🎲 Chọn tổ ngẫu nhiên</button>
@@ -226,22 +210,15 @@
       <button id="closeAdmin" class="btn ghost">Đóng</button>
     </div>
 
-    <!-- Tên trường / lớp -->
-    <div style="margin-bottom:20px;">
-      <label class="lbl">Tên Trường / Lớp (Hiển thị khi xuất file)</label>
-      <input type="text" id="classNameInput" placeholder="VD: Trường THCS ABC - Lớp 6A1">
-    </div>
-
-    <!-- Hẹn giờ tự động -->
-    <div style="background:#f0fdf4; border:1px solid #a7f3d0; padding:14px; border-radius:12px; margin-bottom:20px;">
-      <label class="lbl" style="color:var(--ok);">⏱️ Hẹn giờ tự động chia tổ</label>
-      <div style="display:flex; gap:10px; align-items:center;">
-        <input type="number" id="timerInput" min="1" value="5" style="width:80px; padding:8px;" placeholder="Phút">
-        <span style="font-size:.9rem; font-weight:600;">phút</span>
-        <button id="startTimerBtn" class="btn ghost" style="background:var(--ok); color:#fff; flex:1;">Bắt đầu đếm ngược</button>
-        <button id="stopTimerBtn" class="btn danger" style="display:none;">Hủy đếm ngược</button>
+    <div class="setup" style="margin-bottom:20px;">
+      <div>
+        <label class="lbl">Tên Trường / Lớp (Hiển thị khi xuất file)</label>
+        <input type="text" id="classNameInput" placeholder="VD: Trường THCS ABC - Lớp 6A1">
       </div>
-      <p style="margin:8px 0 0; font-size:.8rem; color:#4b5563;">Hết thời gian, những bạn chưa chọn sẽ bị hệ thống tự động chia ngẫu nhiên.</p>
+      <div>
+        <label class="lbl">Ngày hoàn thành (Hiển thị khi xuất file)</label>
+        <input type="date" id="completionDateInput">
+      </div>
     </div>
 
     <div class="setup">
@@ -272,7 +249,10 @@
 
     <!-- Bảng thống kê trạng thái -->
     <div class="mode-block">
-      <div class="lbl">📊 Trạng thái chọn tổ của học sinh</div>
+      <div class="lbl" style="display:flex; justify-content:space-between; align-items:center;">
+        <span>📊 Trạng thái chọn tổ của học sinh</span>
+        <button id="autoAssignBtn" class="btn danger" style="padding:4px 10px; font-size:0.8rem;">⚡ Tự động chia người còn lại</button>
+      </div>
       <div class="status-list">
         <div class="status-col done">
           <h4>Đã chọn tổ <span id="countDone">0</span></h4>
@@ -303,9 +283,10 @@
 let currentPass = localStorage.getItem('chiaTo_pass') || '1234';
 
 /* ============ STATE ============ */
-const LS = 'chiaTo_v8';
+const LS = 'chiaTo_v9';
 let state = {
   className: '',
+  completionDate: '',
   students: [
     'Nguyễn Văn An', 'Trần Thị Bình', 'Lê Hoàng Cường', 'Phạm Thu Dung',
     'Hoàng Minh Đức', 'Vũ Thị Hoa', 'Đỗ Quang Huy', 'Ngô Thanh Lan'
@@ -315,12 +296,10 @@ let state = {
     {name:'Tổ 3', cap:2}, {name:'Tổ 4', cap:2}
   ],
   assigned: [],       // {name, gi, auto}
-  doneMode: 'lock',
-  deadline: null      
+  doneMode: 'lock'
 };
 let rolling = false;
 let isAdmin = false; 
-let timerInterval = null;
 
 const $  = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"']/g, c =>
@@ -339,89 +318,11 @@ function load(){
   if(!Array.isArray(state.assigned)) state.assigned = [];
   if(!Array.isArray(state.groups))   state.groups   = [];
   if(state.doneMode !== 'lock' && state.doneMode !== 'remove') state.doneMode = 'lock';
-  if(typeof state.deadline === 'undefined') state.deadline = null;
   if(typeof state.className === 'undefined') state.className = '';
+  if(typeof state.completionDate === 'undefined') state.completionDate = '';
 }
 function save(){
   try{ localStorage.setItem(LS, JSON.stringify(state)); }catch(e){}
-}
-
-/* ============================================================
-   ĐỒNG HỒ ĐẾM NGƯỢC & TỰ ĐỘNG CHIA
-   ============================================================ */
-function startTimer(minutes){
-  if(!minutes || minutes <= 0) return alert('Vui lòng nhập số phút hợp lệ!');
-  state.deadline = Date.now() + minutes * 60000;
-  save();
-  tickTimer();
-}
-
-function cancelTimer(){
-  state.deadline = null;
-  save();
-  tickTimer();
-}
-
-function tickTimer(){
-  clearInterval(timerInterval);
-  const box = $('timerBox');
-  const disp = $('timeDisplay');
-
-  if(!state.deadline){
-    box.classList.remove('active', 'danger');
-    if($('startTimerBtn')) $('startTimerBtn').style.display = 'block';
-    if($('stopTimerBtn')) $('stopTimerBtn').style.display = 'none';
-    return;
-  }
-
-  if($('startTimerBtn')) $('startTimerBtn').style.display = 'none';
-  if($('stopTimerBtn')) $('stopTimerBtn').style.display = 'block';
-
-  timerInterval = setInterval(()=>{
-    const left = state.deadline - Date.now();
-    if(left <= 0){
-      clearInterval(timerInterval);
-      state.deadline = null;
-      save();
-      box.classList.remove('active');
-      disp.textContent = "00:00";
-      autoAssignRemaining();
-      return;
-    }
-
-    box.classList.add('active');
-    if(left < 60000) box.classList.add('danger');
-    else box.classList.remove('danger');
-
-    const m = Math.floor(left / 60000);
-    const s = Math.floor((left % 60000) / 1000);
-    disp.textContent = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
-  }, 1000);
-}
-
-function autoAssignRemaining(){
-  const doneSet = new Set(state.assigned.map(a => a.name.toLowerCase()));
-  const unassigned = state.students.filter(n => !doneSet.has(n.toLowerCase()));
-  
-  if(!unassigned.length) return;
-
-  let count = 0;
-  for(const name of unassigned){
-    const gi = pickGroup();
-    if(gi !== -1){
-      state.assigned.push({ name, gi, auto: true });
-      count++;
-    }
-  }
-  save();
-  renderAll();
-  
-  if(count > 0){
-    const el = $('result');
-    el.className = 'result warn';
-    el.innerHTML = `Hết thời gian! Hệ thống đã tự động chia tổ cho ${count} bạn chưa chọn.`;
-    el.scrollIntoView({ behavior:'smooth', block:'center' });
-  }
 }
 
 /* ============================================================
@@ -434,10 +335,10 @@ function openAdmin(){
   
   $('studentsInput').value = state.students.join('\n');
   $('classNameInput').value = state.className || '';
+  $('completionDateInput').value = state.completionDate || '';
   renderGroupConfig();
   renderSummary();
   renderStatusList();
-  tickTimer();
 
   document.querySelectorAll('input[name="doneMode"]').forEach(r=>{
     r.checked = (r.value === state.doneMode);
@@ -476,16 +377,14 @@ $('savePassBtn').addEventListener('click', ()=>{
   alert('Đã đổi mật khẩu thành công!\nLần sau mở cài đặt, hãy dùng mật khẩu mới này nhé.');
 });
 
-$('startTimerBtn').addEventListener('click', ()=>{
-  const m = parseInt($('timerInput').value);
-  startTimer(m);
-});
-$('stopTimerBtn').addEventListener('click', cancelTimer);
-
 $('classNameInput').addEventListener('input', e=>{
   state.className = e.target.value;
+  save(); updateTitle();
+});
+
+$('completionDateInput').addEventListener('change', e=>{
+  state.completionDate = e.target.value;
   save();
-  updateTitle();
 });
 
 function updateTitle(){
@@ -495,6 +394,33 @@ function updateTitle(){
     $('subTitle').textContent = 'Chọn tên của bạn trong danh sách → bấm nút để nhận tổ';
   }
 }
+
+/* ============ TỰ ĐỘNG CHIA NGƯỜI CÒN LẠI ============ */
+$('autoAssignBtn').addEventListener('click', ()=>{
+  const doneSet = new Set(state.assigned.map(a => a.name.toLowerCase()));
+  const unassigned = state.students.filter(n => !doneSet.has(n.toLowerCase()));
+  
+  if(!unassigned.length) return alert('Tất cả học sinh đã được chia tổ!');
+  if(!confirm(`Có ${unassigned.length} bạn chưa chọn tổ. Hệ thống sẽ tự động chia ngẫu nhiên cho các bạn này?`)) return;
+
+  let count = 0;
+  for(const name of unassigned){
+    const gi = pickGroup();
+    if(gi !== -1){
+      state.assigned.push({ name, gi, auto: true });
+      count++;
+    }
+  }
+  save();
+  renderAll();
+  renderStatusList();
+  
+  if(count > 0){
+    alert(`Đã tự động chia tổ cho ${count} bạn!`);
+  } else {
+    alert('Không thể chia thêm vì các tổ đã đầy!');
+  }
+});
 
 /* ============ HIỂN THỊ TRẠNG THÁI (DÀNH CHO ADMIN) ============ */
 function renderStatusList(){
@@ -785,16 +711,14 @@ function finish(name, gi){
 /* ============ NÚT KHÁC ============ */
 $('resetBtn').addEventListener('click', ()=>{
   if(!isAdmin) return;
-  if(!state.assigned.length && !state.deadline) return;
-  if(!confirm('Xoá toàn bộ kết quả chia tổ và hủy hẹn giờ? (Danh sách học sinh và cấu hình tổ vẫn giữ nguyên)')) return;
+  if(!state.assigned.length) return;
+  if(!confirm('Xoá toàn bộ kết quả chia tổ? (Danh sách học sinh và cấu hình tổ vẫn giữ nguyên)')) return;
   state.assigned = [];
-  state.deadline = null;
   save();
   $('result').className = 'result';
   $('result').innerHTML = '<div class="placeholder">Chọn tên và bấm nút để nhận tổ…</div>';
   renderAll();
   renderStatusList();
-  tickTimer();
 });
 
 $('copyBtn').addEventListener('click', ()=>{
@@ -809,11 +733,12 @@ $('copyBtn').addEventListener('click', ()=>{
     .catch(()=>prompt('Sao chép thủ công:', text));
 });
 
-/* ============ XUẤT FILE EXCEL (ĐẸP, CÓ KẺ BẢNG) ============ */
+/* ============ XUẤT FILE EXCEL ============ */
 $('exportExcelBtn').addEventListener('click', ()=>{
   if(!state.assigned.length) return alert('Chưa có kết quả để xuất file!');
   
-  // Tạo cấu trúc HTML cho Excel
+  let dateStr = state.completionDate ? new Date(state.completionDate).toLocaleDateString('vi-VN') : '';
+  
   let html = `
     <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
     <head>
@@ -840,9 +765,16 @@ $('exportExcelBtn').addEventListener('click', ()=>{
         .name { text-align: left; }
         .group { text-align: center; width: 150px; }
         .role { text-align: center; width: 150px; }
+        .header { text-align: center; font-size: 16pt; font-weight: bold; margin-bottom: 10px; }
+        .meta { font-style: italic; margin-bottom: 10px; text-align: right; }
       </style>
     </head>
     <body>
+      <div class="header">DANH SÁCH CHIA TỔ</div>
+      <div class="meta">
+        ${state.className ? 'Lớp: ' + esc(state.className) + '<br>' : ''}
+        ${dateStr ? 'Ngày hoàn thành: ' + dateStr : ''}
+      </div>
       <table>
         <thead>
           <tr>
@@ -855,7 +787,6 @@ $('exportExcelBtn').addEventListener('click', ()=>{
         <tbody>
   `;
 
-  // Duyệt qua toàn bộ danh sách học sinh
   const map = new Map(state.assigned.map(a => [a.name.toLowerCase(), a]));
   
   state.students.forEach((name, index) => {
@@ -883,7 +814,6 @@ $('exportExcelBtn').addEventListener('click', ()=>{
     </html>
   `;
 
-  // Tạo file .xls (Định dạng Excel cũ nhưng hỗ trợ HTML và CSS cực tốt)
   const blob = new Blob(['\ufeff', html], { type: 'application/vnd.ms-excel' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -895,12 +825,11 @@ $('exportExcelBtn').addEventListener('click', ()=>{
   URL.revokeObjectURL(url);
 });
 
-/* ============ XUẤT FILE WORD (IN ẤN) ============ */
+/* ============ XUẤT FILE WORD ============ */
 $('exportWordBtn').addEventListener('click', ()=>{
   if(!state.assigned.length) return alert('Chưa có kết quả để xuất file!');
   
-  const today = new Date();
-  const dateStr = `ngày ${today.getDate()} tháng ${today.getMonth()+1} năm ${today.getFullYear()}`;
+  let dateStr = state.completionDate ? new Date(state.completionDate).toLocaleDateString('vi-VN') : '';
   
   let html = `
     <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
@@ -930,7 +859,7 @@ $('exportWordBtn').addEventListener('click', ()=>{
         <h1>DANH SÁCH CHIA TỔ</h1>
       </div>
       <div class="meta">
-        Thực hiện ${dateStr}
+        ${dateStr ? 'Ngày hoàn thành: ' + dateStr : ''}
       </div>
   `;
 
@@ -998,7 +927,6 @@ $('exportWordBtn').addEventListener('click', ()=>{
 /* ============ KHỞI ĐỘNG ============ */
 load();
 renderAll();
-tickTimer();
 </script>
 </body>
 </html>
