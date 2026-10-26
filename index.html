@@ -1,0 +1,1004 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chọn tổ ngẫu nhiên</title>
+<style>
+  :root{
+    --pri:#4f46e5; --pri2:#7c3aed; --ok:#10b981;
+    --danger:#ef4444; --line:#e5e7eb; --warn:#f59e0b;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0;
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+    background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);
+    min-height:100vh; padding:24px 12px 60px; color:#1f2937;
+  }
+  .app{max-width:780px;margin:0 auto}
+  header{text-align:center;color:#fff;margin-bottom:22px}
+  header h1{margin:0 0 6px;font-size:clamp(1.4rem,4vw,2rem)}
+  header p{margin:0;opacity:.9;font-size:.95rem}
+
+  .card{background:#fff;border-radius:18px;padding:22px;
+        box-shadow:0 10px 30px rgba(0,0,0,.15);margin-bottom:18px}
+  .card h2{margin:0 0 14px;font-size:1.05rem;color:var(--pri);
+           display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .card h2 .count{font-size:.8rem;font-weight:600;color:#6b7280;
+                  background:#f3f4f6;padding:3px 10px;border-radius:99px}
+
+  /* Nút cài đặt nhỏ, mờ, chỉ giáo viên biết */
+  .admin-gear{
+    position:fixed; top:12px; right:12px;
+    width:36px; height:36px; border-radius:50%; border:0;
+    background:rgba(255,255,255,0.22); color:#fff;
+    font-size:1.05rem; cursor:pointer; transition:.2s; z-index:10;
+    opacity:.35;
+  }
+  .admin-gear:hover{opacity:1;background:rgba(255,255,255,.7);color:#4f46e5}
+
+  /* Đồng hồ đếm ngược */
+  .timer-box{
+    display:none; background:#fffbeb; border:2px solid var(--warn);
+    color:#b45309; padding:12px; border-radius:12px; margin-bottom:16px;
+    text-align:center; font-weight:800; font-size:1.1rem;
+  }
+  .timer-box.active{display:block; animation:pulse-warn 2s infinite}
+  .timer-box.danger{border-color:var(--danger); color:var(--danger); background:#fef2f2;}
+  @keyframes pulse-warn{0%{box-shadow:0 0 0 0 #f59e0b44}70%{box-shadow:0 0 0 10px #f59e0b00}100%{box-shadow:0 0 0 0 #f59e0b00}}
+
+  /* ============ CHỌN TÊN ============ */
+  .pick{display:flex;flex-direction:column;gap:14px}
+  select{
+    width:100%; padding:14px 16px; font:inherit; font-size:1.05rem;
+    border:2px solid var(--line); border-radius:12px; background:#fff;
+    color:#1f2937; cursor:pointer; transition:.15s; outline:none;
+    font-weight:600;
+  }
+  select:hover:not(:disabled){border-color:#a5b4fc}
+  select:focus{border-color:var(--pri);box-shadow:0 0 0 3px #4f46e522}
+  select:disabled{opacity:.6;cursor:not-allowed;background:#f9fafb}
+
+  .big-btn{
+    width:100%; padding:16px; border:0; border-radius:14px; cursor:pointer;
+    font-size:1.15rem; font-weight:800; color:#fff; font-family:inherit;
+    background:linear-gradient(135deg,var(--pri),var(--pri2));
+    box-shadow:0 8px 20px #4f46e544; transition:.2s;
+  }
+  .big-btn:hover:not(:disabled){transform:translateY(-2px);box-shadow:0 12px 26px #4f46e455}
+  .big-btn:active:not(:disabled){transform:scale(.98)}
+  .big-btn:disabled{opacity:.55;cursor:not-allowed;transform:none;box-shadow:none}
+
+  .hint{font-size:.85rem;color:#6b7280;margin:12px 0 0}
+  .empty{font-size:.85rem;color:#9ca3af;font-style:italic}
+
+  /* ============ KẾT QUẢ ============ */
+  .result{
+    min-height:170px; border:2px dashed var(--line); border-radius:16px;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:6px; padding:18px; text-align:center; transition:.2s;
+  }
+  .result .placeholder{font-size:.95rem;color:#9ca3af;font-style:italic}
+  .result .who{font-size:1.05rem;color:#6b7280;font-weight:700}
+  .result .arrow{font-size:.85rem;color:#9ca3af}
+  .result .grp{font-size:clamp(2rem,8vw,3.2rem);font-weight:900;color:var(--pri);line-height:1.1}
+  .result .rolling-text{font-size:clamp(2rem,8vw,3.2rem);font-weight:900;color:#9ca3af}
+  .result.final{border-color:var(--ok);background:#f0fdf4;animation:pop .45s ease}
+  .result.warn{border-color:#fcd34d;background:#fffbeb;color:#92400e;
+               font-weight:700;font-size:.95rem}
+  @keyframes pop{0%{transform:scale(.85);opacity:.4}60%{transform:scale(1.04)}100%{transform:scale(1)}}
+
+  /* ============ BẢNG CHIA TỔ ============ */
+  .groups-view{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px}
+  .gcard{background:#f9fafb;border:2px solid var(--line);border-radius:14px;padding:12px}
+  .gcard.full{border-color:var(--ok);background:#f0fdf4}
+  .ghead{display:flex;justify-content:space-between;align-items:center;font-weight:800;font-size:.95rem}
+  .ghead span:last-child{color:#6b7280;font-weight:600;font-size:.85rem}
+  .bar{height:7px;background:#e5e7eb;border-radius:99px;overflow:hidden;margin:8px 0 10px}
+  .bar>i{display:block;height:100%;background:linear-gradient(90deg,#34d399,#10b981);
+         border-radius:99px;transition:width .3s}
+  .namelist{display:flex;flex-wrap:wrap;gap:6px}
+  .chip{background:#fff;border:1px solid #d1d5db;border-radius:99px;
+        padding:3px 10px;font-size:.82rem;display:flex;align-items:center;gap:6px}
+  .chip button{border:0;background:transparent;color:var(--danger);
+               cursor:pointer;font-weight:800;font-size:.85rem;line-height:1;padding:0 2px}
+  .chip .auto-tag{font-size:.65rem;background:#e5e7eb;color:#4b5563;padding:1px 5px;border-radius:4px;font-weight:700}
+  
+  .actions{display:flex;gap:10px;margin-top:16px;flex-wrap:wrap}
+  .btn{border:0;border-radius:10px;padding:9px 14px;font-size:.9rem;
+       font-weight:600;cursor:pointer;font-family:inherit;transition:.15s;
+       display:flex; align-items:center; justify-content:center; gap:6px;}
+  .btn.ghost{background:#eef2ff;color:var(--pri)}
+  .btn.ghost:hover{background:#e0e7ff}
+  .btn.ok{background:#ecfdf5;color:var(--ok)}
+  .btn.ok:hover{background:#d1fae5}
+  .btn.primary{background:#e0f2fe;color:#0284c7;}
+  .btn.primary:hover{background:#bae6fd;}
+  .btn.danger{background:#fee2e2;color:var(--danger)}
+  .btn.danger:hover{background:#fecaca}
+
+  /* ============ MODAL CÀI ĐẶT ============ */
+  .modal{
+    position:fixed; inset:0; background:rgba(0,0,0,.55);
+    display:flex; align-items:flex-start; justify-content:center;
+    padding:30px 14px; z-index:100; overflow-y:auto;
+  }
+  .modal[hidden]{display:none}
+  .modal-box{
+    background:#fff; border-radius:18px; max-width:900px; width:100%;
+    padding:22px; box-shadow:0 20px 50px rgba(0,0,0,.3);
+    animation:pop .25s ease;
+  }
+  .modal-head{display:flex;justify-content:space-between;align-items:center;
+              margin-bottom:16px;gap:10px}
+  .modal-head h2{margin:0;color:var(--pri);font-size:1.1rem}
+
+  .setup{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+  @media(max-width:760px){.setup{grid-template-columns:1fr}}
+
+  .lbl{display:block;font-size:.85rem;font-weight:600;color:#4b5563;margin-bottom:6px}
+  textarea,input[type=text],input[type=number]{
+    width:100%;padding:10px 12px;border:1.5px solid var(--line);
+    border-radius:10px;font-size:.95rem;font-family:inherit;outline:none;
+    background:#fff;transition:.15s;
+  }
+  textarea{resize:vertical;line-height:1.5}
+  textarea:focus,input:focus{border-color:var(--pri);box-shadow:0 0 0 3px #4f46e522}
+
+  .group-config{display:flex;flex-direction:column;gap:8px;margin-bottom:10px}
+  .group-row{display:grid;grid-template-columns:26px 1fr 78px 32px;gap:8px;align-items:center}
+  .group-row .idx{font-size:.8rem;color:#9ca3af;text-align:center;font-weight:700}
+  .group-row .del{border:0;background:#fee2e2;color:var(--danger);border-radius:8px;
+                  height:34px;cursor:pointer;font-weight:700;transition:.15s}
+  .group-row .del:hover{background:#fecaca}
+  .summary{font-size:.85rem;color:#6b7280;margin:10px 0 0;line-height:1.6}
+  .summary b{color:var(--pri)}
+
+  .mode-block{margin-top:18px;padding-top:16px;border-top:1px solid var(--line)}
+  .radio-item{display:flex;align-items:center;gap:8px;padding:6px 0;font-size:.92rem;cursor:pointer}
+  .radio-item input{width:auto;cursor:pointer}
+
+  /* Bảng thống kê trạng thái trong Admin */
+  .status-list{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:10px}
+  @media(max-width:600px){.status-list{grid-template-columns:1fr}}
+  .status-col{background:#f9fafb;border:1px solid var(--line);border-radius:12px;padding:12px;max-height:200px;overflow-y:auto;}
+  .status-col h4{margin:0 0 8px;font-size:.9rem;display:flex;justify-content:space-between;}
+  .status-col.done h4{color:var(--ok)}
+  .status-col.todo h4{color:var(--danger)}
+  .status-item{font-size:.85rem;padding:4px 0;border-bottom:1px dashed #e5e7eb;display:flex;justify-content:space-between;}
+  .status-item:last-child{border-bottom:none;}
+  .status-item span:last-child{font-weight:700;color:#6b7280}
+</style>
+</head>
+<body>
+
+<button id="adminBtn" class="admin-gear" title="Cài đặt">⚙️</button>
+
+<div class="app">
+  <header>
+    <h1>🎲 Chọn tổ ngẫu nhiên</h1>
+    <p id="subTitle">Chọn tên của bạn trong danh sách → bấm nút để nhận tổ</p>
+  </header>
+
+  <!-- CHỌN TÊN + NÚT -->
+  <section class="card">
+    <h2>👆 Chọn tên của bạn <span class="count" id="nameCount"></span></h2>
+    
+    <!-- Đồng hồ đếm ngược -->
+    <div id="timerBox" class="timer-box">
+      ⏳ Thời gian còn lại: <span id="timeDisplay">00:00</span>
+    </div>
+
+    <div class="pick">
+      <select id="studentSelect"></select>
+      <button id="drawBtn" class="big-btn">🎲 Chọn tổ ngẫu nhiên</button>
+    </div>
+    <p id="hint" class="hint"></p>
+  </section>
+
+  <!-- KẾT QUẢ -->
+  <section class="card">
+    <h2>🎯 Kết quả của bạn</h2>
+    <div id="result" class="result">
+      <div class="placeholder">Chọn tên và bấm nút để nhận tổ…</div>
+    </div>
+  </section>
+
+  <!-- BẢNG CHIA TỔ -->
+  <section class="card">
+    <h2>📋 Bảng chia tổ</h2>
+    <div id="groupsView" class="groups-view"></div>
+    <div class="actions">
+      <button id="exportExcelBtn" class="btn primary">📊 Xuất file Excel (Đẹp)</button>
+      <button id="exportWordBtn" class="btn ok">📥 Xuất Word (In ấn)</button>
+      <button id="copyBtn" class="btn ghost">📄 Copy văn bản</button>
+      <button id="resetBtn" class="btn danger" style="display:none;">🗑️ Chia lại từ đầu</button>
+    </div>
+  </section>
+</div>
+
+<!-- MODAL CÀI ĐẶT -->
+<div id="adminModal" class="modal" hidden>
+  <div class="modal-box">
+    <div class="modal-head">
+      <h2>⚙️ Cài đặt (Giáo viên)</h2>
+      <button id="closeAdmin" class="btn ghost">Đóng</button>
+    </div>
+
+    <!-- Tên trường / lớp -->
+    <div style="margin-bottom:20px;">
+      <label class="lbl">Tên Trường / Lớp (Hiển thị khi xuất file)</label>
+      <input type="text" id="classNameInput" placeholder="VD: Trường THCS ABC - Lớp 6A1">
+    </div>
+
+    <!-- Hẹn giờ tự động -->
+    <div style="background:#f0fdf4; border:1px solid #a7f3d0; padding:14px; border-radius:12px; margin-bottom:20px;">
+      <label class="lbl" style="color:var(--ok);">⏱️ Hẹn giờ tự động chia tổ</label>
+      <div style="display:flex; gap:10px; align-items:center;">
+        <input type="number" id="timerInput" min="1" value="5" style="width:80px; padding:8px;" placeholder="Phút">
+        <span style="font-size:.9rem; font-weight:600;">phút</span>
+        <button id="startTimerBtn" class="btn ghost" style="background:var(--ok); color:#fff; flex:1;">Bắt đầu đếm ngược</button>
+        <button id="stopTimerBtn" class="btn danger" style="display:none;">Hủy đếm ngược</button>
+      </div>
+      <p style="margin:8px 0 0; font-size:.8rem; color:#4b5563;">Hết thời gian, những bạn chưa chọn sẽ bị hệ thống tự động chia ngẫu nhiên.</p>
+    </div>
+
+    <div class="setup">
+      <div>
+        <label class="lbl" for="studentsInput">Danh sách học sinh (mỗi dòng một tên)</label>
+        <textarea id="studentsInput" rows="8"
+          placeholder="Nguyễn Văn An&#10;Trần Thị Bình&#10;Lê Hoàng Cường"></textarea>
+      </div>
+      <div>
+        <label class="lbl">Các tổ &amp; số lượng mỗi tổ</label>
+        <div id="groupConfig" class="group-config"></div>
+        <button id="addGroup" class="btn ghost">+ Thêm tổ</button>
+        <p id="summary" class="summary"></p>
+      </div>
+    </div>
+
+    <div class="mode-block">
+      <div class="lbl">Sau khi học sinh đã chọn tổ:</div>
+      <label class="radio-item">
+        <input type="radio" name="doneMode" value="lock">
+        Giữ lại, khóa lại và hiện tên tổ bên cạnh
+      </label>
+      <label class="radio-item">
+        <input type="radio" name="doneMode" value="remove">
+        Xóa khỏi danh sách chọn
+      </label>
+    </div>
+
+    <!-- Bảng thống kê trạng thái -->
+    <div class="mode-block">
+      <div class="lbl">📊 Trạng thái chọn tổ của học sinh</div>
+      <div class="status-list">
+        <div class="status-col done">
+          <h4>Đã chọn tổ <span id="countDone">0</span></h4>
+          <div id="listDone"></div>
+        </div>
+        <div class="status-col todo">
+          <h4>Chưa chọn <span id="countTodo">0</span></h4>
+          <div id="listTodo"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Đổi mật khẩu -->
+    <div class="mode-block" style="border-top:2px dashed #e5e7eb;">
+      <div class="lbl" style="color:var(--danger);">🔒 Đổi mật khẩu giáo viên</div>
+      <div style="display:flex; gap:10px; align-items:center;">
+        <input type="text" id="newPassInput" placeholder="Nhập mật khẩu mới..." style="flex:1;">
+        <button id="savePassBtn" class="btn ghost" style="white-space:nowrap;">Lưu mật khẩu</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   MẬT KHẨU MẶC ĐỊNH
+   ============================================================ */
+let currentPass = localStorage.getItem('chiaTo_pass') || '1234';
+
+/* ============ STATE ============ */
+const LS = 'chiaTo_v8';
+let state = {
+  className: '',
+  students: [
+    'Nguyễn Văn An', 'Trần Thị Bình', 'Lê Hoàng Cường', 'Phạm Thu Dung',
+    'Hoàng Minh Đức', 'Vũ Thị Hoa', 'Đỗ Quang Huy', 'Ngô Thanh Lan'
+  ],
+  groups: [
+    {name:'Tổ 1', cap:2}, {name:'Tổ 2', cap:2},
+    {name:'Tổ 3', cap:2}, {name:'Tổ 4', cap:2}
+  ],
+  assigned: [],       // {name, gi, auto}
+  doneMode: 'lock',
+  deadline: null      
+};
+let rolling = false;
+let isAdmin = false; 
+let timerInterval = null;
+
+const $  = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"']/g, c =>
+  ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+/* ============ LƯU / TẢI ============ */
+function load(){
+  try{
+    const raw = localStorage.getItem(LS);
+    if(raw){
+      const d = JSON.parse(raw);
+      if(d && Array.isArray(d.groups)) state = d;
+    }
+  }catch(e){}
+  if(!Array.isArray(state.students)) state.students = [];
+  if(!Array.isArray(state.assigned)) state.assigned = [];
+  if(!Array.isArray(state.groups))   state.groups   = [];
+  if(state.doneMode !== 'lock' && state.doneMode !== 'remove') state.doneMode = 'lock';
+  if(typeof state.deadline === 'undefined') state.deadline = null;
+  if(typeof state.className === 'undefined') state.className = '';
+}
+function save(){
+  try{ localStorage.setItem(LS, JSON.stringify(state)); }catch(e){}
+}
+
+/* ============================================================
+   ĐỒNG HỒ ĐẾM NGƯỢC & TỰ ĐỘNG CHIA
+   ============================================================ */
+function startTimer(minutes){
+  if(!minutes || minutes <= 0) return alert('Vui lòng nhập số phút hợp lệ!');
+  state.deadline = Date.now() + minutes * 60000;
+  save();
+  tickTimer();
+}
+
+function cancelTimer(){
+  state.deadline = null;
+  save();
+  tickTimer();
+}
+
+function tickTimer(){
+  clearInterval(timerInterval);
+  const box = $('timerBox');
+  const disp = $('timeDisplay');
+
+  if(!state.deadline){
+    box.classList.remove('active', 'danger');
+    if($('startTimerBtn')) $('startTimerBtn').style.display = 'block';
+    if($('stopTimerBtn')) $('stopTimerBtn').style.display = 'none';
+    return;
+  }
+
+  if($('startTimerBtn')) $('startTimerBtn').style.display = 'none';
+  if($('stopTimerBtn')) $('stopTimerBtn').style.display = 'block';
+
+  timerInterval = setInterval(()=>{
+    const left = state.deadline - Date.now();
+    if(left <= 0){
+      clearInterval(timerInterval);
+      state.deadline = null;
+      save();
+      box.classList.remove('active');
+      disp.textContent = "00:00";
+      autoAssignRemaining();
+      return;
+    }
+
+    box.classList.add('active');
+    if(left < 60000) box.classList.add('danger');
+    else box.classList.remove('danger');
+
+    const m = Math.floor(left / 60000);
+    const s = Math.floor((left % 60000) / 1000);
+    disp.textContent = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+  }, 1000);
+}
+
+function autoAssignRemaining(){
+  const doneSet = new Set(state.assigned.map(a => a.name.toLowerCase()));
+  const unassigned = state.students.filter(n => !doneSet.has(n.toLowerCase()));
+  
+  if(!unassigned.length) return;
+
+  let count = 0;
+  for(const name of unassigned){
+    const gi = pickGroup();
+    if(gi !== -1){
+      state.assigned.push({ name, gi, auto: true });
+      count++;
+    }
+  }
+  save();
+  renderAll();
+  
+  if(count > 0){
+    const el = $('result');
+    el.className = 'result warn';
+    el.innerHTML = `Hết thời gian! Hệ thống đã tự động chia tổ cho ${count} bạn chưa chọn.`;
+    el.scrollIntoView({ behavior:'smooth', block:'center' });
+  }
+}
+
+/* ============================================================
+   MODAL CÀI ĐẶT & QUẢN TRỊ
+   ============================================================ */
+function openAdmin(){
+  isAdmin = true;
+  $('resetBtn').style.display = 'inline-block'; 
+  renderBoard(); 
+  
+  $('studentsInput').value = state.students.join('\n');
+  $('classNameInput').value = state.className || '';
+  renderGroupConfig();
+  renderSummary();
+  renderStatusList();
+  tickTimer();
+
+  document.querySelectorAll('input[name="doneMode"]').forEach(r=>{
+    r.checked = (r.value === state.doneMode);
+  });
+  $('newPassInput').value = ''; 
+  $('adminModal').hidden = false;
+}
+
+function closeAdmin(){ 
+  isAdmin = false;
+  $('resetBtn').style.display = 'none'; 
+  renderBoard(); 
+  $('adminModal').hidden = true; 
+}
+
+$('adminBtn').addEventListener('click', ()=>{
+  if(isAdmin) return openAdmin(); 
+  const p = prompt('Nhập mật khẩu giáo viên:');
+  if(p === null) return;
+  if(p === currentPass) openAdmin();
+  else alert('Sai mật khẩu!');
+});
+
+$('closeAdmin').addEventListener('click', closeAdmin);
+$('adminModal').addEventListener('click', e=>{
+  if(e.target === $('adminModal')) closeAdmin();
+});
+
+$('savePassBtn').addEventListener('click', ()=>{
+  const newPass = $('newPassInput').value.trim();
+  if(!newPass) return alert('Mật khẩu không được để trống!');
+  if(newPass === currentPass) return alert('Mật khẩu mới trùng với mật khẩu cũ!');
+  currentPass = newPass;
+  localStorage.setItem('chiaTo_pass', currentPass);
+  $('newPassInput').value = '';
+  alert('Đã đổi mật khẩu thành công!\nLần sau mở cài đặt, hãy dùng mật khẩu mới này nhé.');
+});
+
+$('startTimerBtn').addEventListener('click', ()=>{
+  const m = parseInt($('timerInput').value);
+  startTimer(m);
+});
+$('stopTimerBtn').addEventListener('click', cancelTimer);
+
+$('classNameInput').addEventListener('input', e=>{
+  state.className = e.target.value;
+  save();
+  updateTitle();
+});
+
+function updateTitle(){
+  if(state.className.trim()){
+    $('subTitle').textContent = state.className;
+  }else{
+    $('subTitle').textContent = 'Chọn tên của bạn trong danh sách → bấm nút để nhận tổ';
+  }
+}
+
+/* ============ HIỂN THỊ TRẠNG THÁI (DÀNH CHO ADMIN) ============ */
+function renderStatusList(){
+  const doneList = $('listDone');
+  const todoList = $('listTodo');
+  let htmlDone = '', htmlTodo = '';
+  let countDone = 0, countTodo = 0;
+
+  const map = new Map(state.assigned.map(a => [a.name.toLowerCase(), a]));
+
+  state.students.forEach(n => {
+    const rec = map.get(n.toLowerCase());
+    if(rec && state.groups[rec.gi]){
+      countDone++;
+      const gname = state.groups[rec.gi].name;
+      const autoTag = rec.auto ? '<span style="color:var(--warn); font-size:0.75rem;">(Tự động)</span>' : '';
+      htmlDone += `<div class="status-item"><span>${esc(n)} ${autoTag}</span><span>${esc(gname)}</span></div>`;
+    }else{
+      countTodo++;
+      htmlTodo += `<div class="status-item"><span>${esc(n)}</span></div>`;
+    }
+  });
+
+  $('countDone').textContent = countDone;
+  $('countTodo').textContent = countTodo;
+  doneList.innerHTML = htmlDone || '<div class="empty">Chưa có ai</div>';
+  todoList.innerHTML = htmlTodo || '<div class="empty">Đã chia xong</div>';
+}
+
+/* ============ CHẾ ĐỘ SAU KHI CHỌN ============ */
+document.querySelectorAll('input[name="doneMode"]').forEach(r=>{
+  r.addEventListener('change', e=>{
+    state.doneMode = e.target.value;
+    save(); renderSelect(); renderHint();
+  });
+});
+
+/* ============ CẤU HÌNH TỔ ============ */
+function renderGroupConfig(){
+  $('groupConfig').innerHTML = state.groups.map((g,i)=>`
+    <div class="group-row">
+      <span class="idx">${i+1}</span>
+      <input class="gname" data-i="${i}" value="${esc(g.name)}" placeholder="Tên tổ">
+      <input class="gcap" data-i="${i}" type="number" min="0" value="${g.cap}">
+      <button class="del" data-i="${i}" title="Xoá tổ">✕</button>
+    </div>`).join('');
+}
+
+$('groupConfig').addEventListener('input', e=>{
+  const i = +e.target.dataset.i;
+  if(isNaN(i) || !state.groups[i]) return;
+  if(e.target.classList.contains('gname')){
+    state.groups[i].name = e.target.value;
+  }else if(e.target.classList.contains('gcap')){
+    state.groups[i].cap = Math.max(0, parseInt(e.target.value) || 0);
+  }
+  save();
+  renderBoard(); renderSummary(); renderSelect(); renderHint(); renderStatusList();
+});
+
+$('groupConfig').addEventListener('click', e=>{
+  if(!e.target.classList.contains('del')) return;
+  const i = +e.target.dataset.i;
+  const g = state.groups[i];
+  if(!confirm(`Xoá "${g.name}"? Các bạn đã chia vào tổ này sẽ được trả về danh sách chưa chia.`)) return;
+  state.groups.splice(i,1);
+  state.assigned = state.assigned
+    .filter(a => a.gi !== i)
+    .map(a => a.gi > i ? {name:a.name, gi:a.gi-1, auto: a.auto} : a);
+  save(); renderGroupConfig(); renderAll(); renderStatusList();
+});
+
+$('addGroup').addEventListener('click', ()=>{
+  state.groups.push({name:'Tổ ' + (state.groups.length+1), cap:2});
+  save(); renderGroupConfig(); renderAll();
+});
+
+/* ============ DANH SÁCH HỌC SINH ============ */
+$('studentsInput').addEventListener('input', e=>{
+  const seen = new Set();
+  state.students = e.target.value.split('\n')
+    .map(s => s.trim())
+    .filter(s => {
+      if(!s) return false;
+      const k = s.toLowerCase();
+      if(seen.has(k)) return false;
+      seen.add(k); return true;
+    });
+  const set = new Set(state.students.map(s=>s.toLowerCase()));
+  state.assigned = state.assigned.filter(a => set.has(a.name.toLowerCase()));
+  save(); renderAll(); renderStatusList();
+});
+
+/* ============ HIỂN THỊ DROPDOWN ============ */
+function renderSelect(){
+  const sel = $('studentSelect');
+  const cur = sel.value;
+  const map = new Map(state.assigned.map(a => [a.name.toLowerCase(), a.gi]));
+  const doneMode = state.doneMode || 'lock';
+
+  let html = '';
+  let available = 0;
+
+  for(const n of state.students){
+    const gi = map.get(n.toLowerCase());
+    const isDone = gi !== undefined && state.groups[gi];
+
+    if(isDone){
+      if(doneMode === 'remove') continue;
+      html += `<option value="" disabled>✓ ${esc(n)} — ${esc(state.groups[gi].name)}</option>`;
+    }else{
+      available++;
+      html += `<option value="${esc(n)}">${esc(n)}</option>`;
+    }
+  }
+
+  if(!state.students.length){
+    sel.innerHTML = `<option value="">(Chưa có học sinh — mở ⚙️ để nhập)</option>`;
+    sel.disabled = true;
+    $('drawBtn').disabled = true;
+    return;
+  }
+
+  if(!available){
+    sel.innerHTML = `<option value="">🎉 Tất cả đã được chia tổ!</option>`;
+    sel.disabled = true;
+    $('drawBtn').disabled = true;
+    return;
+  }
+
+  sel.disabled = false;
+  $('drawBtn').disabled = false;
+  sel.innerHTML = `<option value="">-- Chọn tên của bạn (${available} bạn chưa chia) --</option>` + html;
+  if(cur && !map.has(cur.toLowerCase()) && state.students.includes(cur)) sel.value = cur;
+}
+
+function renderHint(){
+  const done = state.assigned.length;
+  const total = state.students.length;
+  $('nameCount').textContent = `${done}/${total}`;
+  $('hint').textContent = total
+    ? (done < total ? `Còn ${total - done} bạn chưa chọn tổ.` : '🎉 Tất cả học sinh đã được chia tổ!')
+    : 'Mở ⚙️ để nhập danh sách học sinh.';
+}
+
+/* ============ BẢNG CHIA TỔ ============ */
+function renderBoard(){
+  const view = $('groupsView');
+  if(!state.groups.length){
+    view.innerHTML = '<p class="empty">Chưa có tổ nào.</p>';
+    return;
+  }
+  view.innerHTML = state.groups.map((g,gi)=>{
+    const members = state.assigned.filter(a => a.gi === gi);
+    const pct = g.cap ? Math.min(100, members.length / g.cap * 100) : 0;
+    const full = members.length >= g.cap;
+    
+    return `<div class="gcard ${full?'full':''}">
+      <div class="ghead"><span>${esc(g.name)}</span><span>${members.length}/${g.cap}</span></div>
+      <div class="bar"><i style="width:${pct}%"></i></div>
+      <div class="namelist">${
+        members.map(m => `
+          <span class="chip" title="${m.auto ? 'Hệ thống tự động chia' : 'Tự chọn'}">
+            ${esc(m.name)}
+            ${m.auto ? '<span class="auto-tag">Auto</span>' : ''}
+            ${isAdmin ? `<button data-name="${esc(m.name)}" title="Trả về chưa chia">✕</button>` : ''}
+          </span>
+        `).join('')
+        || '<span class="empty">Chưa có ai</span>'
+      }</div>
+    </div>`;
+  }).join('');
+}
+
+function renderSummary(){
+  const totalCap = state.groups.reduce((s,g)=>s + g.cap, 0);
+  let txt = `Tổng học sinh: <b>${state.students.length}</b> · Tổng chỗ các tổ: <b>${totalCap}</b> · Đã chia: <b>${state.assigned.length}</b>`;
+  if(totalCap < state.students.length)
+    txt += `<br>⚠️ Tổng chỗ ít hơn số học sinh (thiếu ${state.students.length - totalCap} chỗ).`;
+  $('summary').innerHTML = txt;
+}
+
+function renderAll(){
+  updateTitle();
+  renderSelect(); renderHint(); renderBoard(); renderSummary();
+}
+
+$('groupsView').addEventListener('click', e=>{
+  const b = e.target.closest('button[data-name]');
+  if(!b) return;
+  if(!isAdmin) return; 
+  state.assigned = state.assigned.filter(a => a.name !== b.dataset.name);
+  save(); renderAll(); renderStatusList();
+});
+
+/* ============ CHỌN TỔ NGẪU NHIÊN ============ */
+function remaining(gi){
+  return state.groups[gi].cap - state.assigned.filter(a => a.gi === gi).length;
+}
+
+function pickGroup(){
+  const pool = state.groups
+    .map((g,i)=>({ i, rem: remaining(i) }))
+    .filter(x => x.rem > 0);
+  if(!pool.length) return -1;
+  const total = pool.reduce((s,x)=>s + x.rem, 0);
+  let r = Math.random() * total;
+  for(const p of pool){
+    r -= p.rem;
+    if(r < 0) return p.i;
+  }
+  return pool[pool.length-1].i;
+}
+
+function showWarn(msg){
+  const el = $('result');
+  el.className = 'result warn';
+  el.textContent = msg;
+  clearTimeout(showWarn._t);
+  showWarn._t = setTimeout(()=>{
+    if(el.className === 'result warn'){
+      el.className = 'result';
+      el.innerHTML = '<div class="placeholder">Chọn tên và bấm nút để nhận tổ…</div>';
+    }
+  }, 3200);
+}
+
+$('drawBtn').addEventListener('click', ()=>{
+  if(rolling) return;
+
+  const name = $('studentSelect').value;
+  if(!name) return showWarn('Vui lòng chọn tên của bạn trong danh sách!');
+  if(!state.groups.length) return showWarn('Chưa có tổ nào.');
+  if(state.assigned.some(a => a.name.toLowerCase() === name.toLowerCase()))
+    return showWarn(`"${name}" đã được chia tổ rồi!`);
+
+  const gi = pickGroup();
+  if(gi === -1) return showWarn('Tất cả các tổ đã đủ số lượng!');
+
+  draw(name, gi);
+});
+
+function draw(name, gi){
+  rolling = true;
+  $('drawBtn').disabled = true;
+  $('studentSelect').disabled = true;
+  const el = $('result');
+  el.className = 'result';
+  el.innerHTML = `<div class="who">${esc(name)}</div>
+                  <div class="arrow">▼</div>
+                  <div class="rolling-text">…</div>`;
+
+  const start = performance.now();
+  const DUR = 1500;
+
+  (function tick(){
+    const elapsed = performance.now() - start;
+    if(elapsed < DUR){
+      const rnd = state.groups[Math.floor(Math.random() * state.groups.length)];
+      el.innerHTML = `<div class="who">${esc(name)}</div>
+                      <div class="arrow">▼</div>
+                      <div class="rolling-text">${esc(rnd.name)}</div>`;
+      const delay = 50 + 260 * Math.pow(elapsed / DUR, 2.2);
+      setTimeout(tick, delay);
+    }else{
+      finish(name, gi);
+      rolling = false;
+    }
+  })();
+}
+
+function finish(name, gi){
+  const g = state.groups[gi];
+  state.assigned.push({ name, gi, auto: false });
+  save();
+
+  const el = $('result');
+  el.className = 'result final';
+  el.innerHTML = `<div class="who">${esc(name)}</div>
+                  <div class="arrow">▼</div>
+                  <div class="grp">${esc(g.name)}</div>`;
+  el.scrollIntoView({ behavior:'smooth', block:'center' });
+
+  renderAll();
+  if(isAdmin) renderStatusList();
+}
+
+/* ============ NÚT KHÁC ============ */
+$('resetBtn').addEventListener('click', ()=>{
+  if(!isAdmin) return;
+  if(!state.assigned.length && !state.deadline) return;
+  if(!confirm('Xoá toàn bộ kết quả chia tổ và hủy hẹn giờ? (Danh sách học sinh và cấu hình tổ vẫn giữ nguyên)')) return;
+  state.assigned = [];
+  state.deadline = null;
+  save();
+  $('result').className = 'result';
+  $('result').innerHTML = '<div class="placeholder">Chọn tên và bấm nút để nhận tổ…</div>';
+  renderAll();
+  renderStatusList();
+  tickTimer();
+});
+
+$('copyBtn').addEventListener('click', ()=>{
+  if(!state.assigned.length) return alert('Chưa có kết quả để sao chép.');
+  const lines = state.groups.map((g,gi)=>{
+    const members = state.assigned.filter(a => a.gi === gi).map(a => a.name + (a.auto ? ' (Auto)' : ''));
+    return `${g.name} (${members.length}/${g.cap}): ${members.join(', ') || '(trống)'}`;
+  });
+  const text = lines.join('\n');
+  navigator.clipboard.writeText(text)
+    .then(()=>alert('Đã sao chép kết quả vào clipboard!'))
+    .catch(()=>prompt('Sao chép thủ công:', text));
+});
+
+/* ============ XUẤT FILE EXCEL (ĐẸP, CÓ KẺ BẢNG) ============ */
+$('exportExcelBtn').addEventListener('click', ()=>{
+  if(!state.assigned.length) return alert('Chưa có kết quả để xuất file!');
+  
+  // Tạo cấu trúc HTML cho Excel
+  let html = `
+    <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+    <head>
+      <meta charset="utf-8">
+      <!--[if gte mso 9]>
+      <xml>
+        <x:ExcelWorkbook>
+          <x:ExcelWorksheets>
+            <x:ExcelWorksheet>
+              <x:Name>Danh sách tổ</x:Name>
+              <x:WorksheetOptions>
+                <x:DisplayGridlines/>
+              </x:WorksheetOptions>
+            </x:ExcelWorksheet>
+          </x:ExcelWorksheets>
+        </x:ExcelWorkbook>
+      </xml>
+      <![endif]-->
+      <style>
+        table { border-collapse: collapse; width: 100%; font-family: 'Times New Roman', Times, serif; font-size: 14pt; }
+        th, td { border: 1px solid #333; padding: 8px 12px; }
+        th { background-color: #e0e7ff; color: #000; font-weight: bold; text-align: center; }
+        .stt { text-align: center; width: 50px; }
+        .name { text-align: left; }
+        .group { text-align: center; width: 150px; }
+        .role { text-align: center; width: 150px; }
+      </style>
+    </head>
+    <body>
+      <table>
+        <thead>
+          <tr>
+            <th class="stt">STT</th>
+            <th class="name">Họ và tên</th>
+            <th class="group">Tổ</th>
+            <th class="role">Chức vụ</th>
+          </tr>
+        </thead>
+        <tbody>
+  `;
+
+  // Duyệt qua toàn bộ danh sách học sinh
+  const map = new Map(state.assigned.map(a => [a.name.toLowerCase(), a]));
+  
+  state.students.forEach((name, index) => {
+    const rec = map.get(name.toLowerCase());
+    let groupName = "Chưa chia";
+    
+    if(rec && state.groups[rec.gi]){
+      groupName = state.groups[rec.gi].name;
+    }
+    
+    html += `
+      <tr>
+        <td class="stt">${index + 1}</td>
+        <td class="name">${esc(name)}</td>
+        <td class="group">${esc(groupName)}</td>
+        <td class="role">Không chức vụ</td>
+      </tr>
+    `;
+  });
+
+  html += `
+        </tbody>
+      </table>
+    </body>
+    </html>
+  `;
+
+  // Tạo file .xls (Định dạng Excel cũ nhưng hỗ trợ HTML và CSS cực tốt)
+  const blob = new Blob(['\ufeff', html], { type: 'application/vnd.ms-excel' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `Danh_sach_chia_to_${state.className ? state.className.replace(/\s+/g, '_') : 'Lop'}.xls`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+});
+
+/* ============ XUẤT FILE WORD (IN ẤN) ============ */
+$('exportWordBtn').addEventListener('click', ()=>{
+  if(!state.assigned.length) return alert('Chưa có kết quả để xuất file!');
+  
+  const today = new Date();
+  const dateStr = `ngày ${today.getDate()} tháng ${today.getMonth()+1} năm ${today.getFullYear()}`;
+  
+  let html = `
+    <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+    <head>
+      <meta charset='utf-8'>
+      <title>Danh sách chia tổ</title>
+      <style>
+        body { font-family: 'Times New Roman', serif; font-size: 14pt; margin: 2cm; }
+        .header { text-align: center; margin-bottom: 30px; }
+        .header h1 { font-size: 20pt; margin: 0 0 10px 0; text-transform: uppercase; }
+        .header h2 { font-size: 16pt; margin: 0; font-weight: normal; font-style: italic; }
+        .meta { text-align: right; margin-bottom: 20px; font-style: italic; }
+        .grid { width: 100%; border-collapse: collapse; }
+        .grid td { vertical-align: top; padding: 10px; width: 50%; }
+        .group-box { border: 1px solid #000; padding: 15px; border-radius: 8px; margin-bottom: 15px; }
+        .group-title { font-size: 16pt; font-weight: bold; border-bottom: 1px solid #ccc; padding-bottom: 5px; margin-bottom: 10px; display: flex; justify-content: space-between;}
+        .member-list { list-style-type: none; padding: 0; margin: 0; }
+        .member-list li { padding: 4px 0; }
+        .auto-tag { font-size: 10pt; color: #f59e0b; font-style: italic; }
+        .footer { margin-top: 40px; display: flex; justify-content: space-between; }
+        .sign-box { text-align: center; width: 45%; }
+      </style>
+    </head>
+    <body>
+      <div class="header">
+        <h2>${state.className ? esc(state.className) : 'Lớp học'}</h2>
+        <h1>DANH SÁCH CHIA TỔ</h1>
+      </div>
+      <div class="meta">
+        Thực hiện ${dateStr}
+      </div>
+  `;
+
+  html += `<table class="grid"><tr>`;
+  
+  state.groups.forEach((g, gi) => {
+    if (gi > 0 && gi % 2 === 0) html += `</tr><tr>`; 
+    
+    const members = state.assigned.filter(a => a.gi === gi);
+    html += `
+      <td>
+        <div class="group-box">
+          <div class="group-title">
+            <span>${esc(g.name)}</span>
+            <span style="font-size: 12pt; font-weight: normal;">(${members.length}/${g.cap})</span>
+          </div>
+          <ul class="member-list">
+    `;
+    
+    if(members.length) {
+      members.forEach((m, idx) => {
+        const auto = m.auto ? ' <span class="auto-tag">(Tự động)</span>' : '';
+        html += `<li>${idx + 1}. ${esc(m.name)}${auto}</li>`;
+      });
+    } else {
+      html += `<li style="font-style: italic; color: #888;">Chưa có học sinh</li>`;
+    }
+    
+    html += `</ul></div></td>`;
+  });
+  
+  if (state.groups.length % 2 !== 0) {
+    html += `<td></td>`;
+  }
+
+  html += `
+      </tr></table>
+      <div class="footer">
+        <div class="sign-box">
+          <p><b>Giáo viên chủ nhiệm</b></p>
+          <p style="font-style: italic; font-size: 12pt;">(Ký và ghi rõ họ tên)</p>
+          <br><br><br>
+        </div>
+        <div class="sign-box">
+          <p><b>Lớp trưởng</b></p>
+          <p style="font-style: italic; font-size: 12pt;">(Ký và ghi rõ họ tên)</p>
+          <br><br><br>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+
+  const blob = new Blob(['\ufeff', html], { type: 'application/msword' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `Danh_sach_chia_to_${state.className ? state.className.replace(/\s+/g, '_') : 'Lop'}.doc`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+});
+
+/* ============ KHỞI ĐỘNG ============ */
+load();
+renderAll();
+tickTimer();
+</script>
+</body>
+</html>
